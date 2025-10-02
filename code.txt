@@ -1,0 +1,8 @@
+//Funktion definieren
+//
+// def Funktion_Name()
+//
+// camelCase für Funktionen und Variablen
+// 
+// z.B: getFood, ageMachine
+//
