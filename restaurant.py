@@ -7,11 +7,10 @@ Einfacher Ablauf: Kunde bestellt -> Kellner -> Küche -> Essen serviert
 import time
 
 MENU_ITEMS = {
-    "1": "Pizza", "01": "Pizza", "pizza": "Pizza",
+    "1": "Pizza", "01": "Pizza", "pizza": "Pizza", 
     "2": "Pasta", "02": "Pasta", "pasta": "Pasta",
     "3": "Bruschetta", "03": "Bruschetta", "bruschetta": "Bruschetta",
     "4": "Steak", "04": "Steak", "steak": "Steak",
-    "034": "Steak"   # Tippfehler-Version aus Vorgabe
 }
 
 def parse_choice(raw: str):
@@ -23,11 +22,11 @@ def parse_choice(raw: str):
 
 def ask_menu() -> str:
     while True:
-        print("\nMenükarte:")
+        print("\nMenükarte: [Zahlen werden nach der 2. Stelle abgeschnitten]")
         print("  01. Pizza")
         print("  02. Pasta")
         print("  03. Bruschetta")
-        print("  04. Steak  (auch '034' möglich)")
+        print("  04. Steak")
         choice = input("Was möchten Sie bestellen? (Nummer oder Name eingeben): ")
         item = parse_choice(choice)
         if item:
