@@ -7,27 +7,49 @@ Einfacher Ablauf: Kunde bestellt -> Kellner -> Küche -> Essen serviert
 import time
 
 MENU_ITEMS = {
-    "1": "Pizza", "01": "Pizza", "pizza": "Pizza", 
+    "1": "Pizza", "01": "Pizza", "pizza": "Pizza",
     "2": "Pasta", "02": "Pasta", "pasta": "Pasta",
     "3": "Bruschetta", "03": "Bruschetta", "bruschetta": "Bruschetta",
     "4": "Steak", "04": "Steak", "steak": "Steak",
 }
 
+# Für Erkennung von Namen in ganzen Sätzen
+ITEM_NAMES = ["pizza", "pasta", "bruschetta", "steak"]
+
 def parse_choice(raw: str):
     s = raw.strip().lower()
+    if not s:
+        return None
+
+    # Direkter exakter Treffer (z. B. "01" oder "pizza")
     if s in MENU_ITEMS:
         return MENU_ITEMS[s]
+
+    # Falls ein Menü-Name irgendwo im Satz vorkommt
+    for name in ITEM_NAMES:
+        if name in s:  # z. B. "pizza" in "ich hätte gerne die pizza"
+            return MENU_ITEMS[name]
+
+    # Ziffern extrahieren (für Fälle wie "Ich nehme die 03 bitte")
     digits = "".join(ch for ch in s if ch.isdigit())
-    return MENU_ITEMS.get(digits)
+    if digits:
+        d2 = digits[:2]  # auf max. 2 Stellen kürzen
+        for key in (d2, d2.lstrip("0")):
+            if key in MENU_ITEMS:
+                return MENU_ITEMS[key]
+
+    return None
 
 def ask_menu() -> str:
     while True:
-        print("\nMenükarte: [Zahlen werden nach der 2. Stelle abgeschnitten]")
+        print("\nMenükarte:")
         print("  01. Pizza")
         print("  02. Pasta")
         print("  03. Bruschetta")
         print("  04. Steak")
-        choice = input("Was möchten Sie bestellen? (Nummer oder Name eingeben): ")
+        choice = input("Was möchten Sie bestellen? (ganzer Satz, Nummer oder Name, 'q' zum Abbrechen): ").strip()
+        if choice.lower() in {"q", "quit"}:
+            raise KeyboardInterrupt("Bestellung abgebrochen.")
         item = parse_choice(choice)
         if item:
             return item
@@ -44,7 +66,13 @@ def main():
 
     # 05–07 Bestellung
     print("Kellner: Sie möchten bestellen?")
-    order = ask_menu()
+    try:
+        order = ask_menu()
+    except KeyboardInterrupt:
+        print("Kellner: Alles klar, ich komme später nochmal vorbei.")
+        print("Programm beendet.")
+        return
+
     print(f"Kunde: Ich hätte gerne {order}!")
 
     # 08–10 Kellner notiert und bestätigt
