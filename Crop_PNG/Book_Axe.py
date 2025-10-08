@@ -8,6 +8,7 @@ Features
 - Choose cropping anchor (preserve area: TL/T/ TR / L / C / R / BL / B / BR)
 - **Optional:** split each picture into two halves (vertical L/R or horizontal T/B) before cropping
   → When splitting, the anchor point is mirrored for the second half.
+  → **New:** Remove a center “book spine” gutter by N pixels before splitting.
 - Supports JPG/JPEG and PNG
 - Start button, progress bar, and log output
 - Skips images smaller than requested crop (to truly "crop" rather than upscale)
@@ -79,6 +80,7 @@ class JobConfig:
     add_suffix: bool
     overwrite: bool
     split_mode: str  # 'none' | 'vertical' | 'horizontal'
+    center_trim: int  # pixels to remove at center (book spine)
 
 
 class CropWorker(QObject):
@@ -122,22 +124,31 @@ class CropWorker(QObject):
         mode = self.config.split_mode
         W, H = im.size
         ax, ay = self.config.anchor_x, self.config.anchor_y
+        g = max(0, int(getattr(self.config, 'center_trim', 0)))
 
         if mode == "vertical":
-            wL = W // 2
-            wR = W - wL
-            left_box = (0, 0, wL, H)
-            right_box = (W - wR, 0, W, H)
-            # Mirror anchor_x for right half
+            # Remove a vertical gutter of width g centered in the image
+            if g >= W:
+                return
+            left_end = (W - g) // 2
+            right_start = W - left_end
+            if left_end <= 0 or right_start >= W:
+                return
+            left_box = (0, 0, left_end, H)
+            right_box = (right_start, 0, W, H)
             mirror_ax = {"left": "right", "right": "left"}.get(ax, ax)
             yield ("left", im.crop(left_box), ax, ay)
             yield ("right", im.crop(right_box), mirror_ax, ay)
         elif mode == "horizontal":
-            hT = H // 2
-            hB = H - hT
-            top_box = (0, 0, W, hT)
-            bottom_box = (0, H - hB, W, H)
-            # Mirror anchor_y for bottom half
+            # Remove a horizontal gutter of height g centered in the image
+            if g >= H:
+                return
+            top_end = (H - g) // 2
+            bottom_start = H - top_end
+            if top_end <= 0 or bottom_start >= H:
+                return
+            top_box = (0, 0, W, top_end)
+            bottom_box = (0, bottom_start, W, H)
             mirror_ay = {"top": "bottom", "bottom": "top"}.get(ay, ay)
             yield ("top", im.crop(top_box), ax, ay)
             yield ("bottom", im.crop(bottom_box), ax, mirror_ay)
@@ -196,7 +207,7 @@ class CropWorker(QObject):
                         cropped.save(dst, **save_params)
                         processed += 1
                         self.message.emit(
-                            f"OK: {src.name} [{half_tag}] -> {dst.relative_to(self.config.out_dir.parent)}"
+                            f"OK: {src.name} [{half_tag}] -> {dst}"
                         )
 
             except Exception as e:
@@ -250,6 +261,12 @@ class MainWindow(QWidget):
             self.split_combo.addItem(label, userData=key)
         self.split_combo.setCurrentIndex(0)
 
+        # Middle crop (book spine) width in pixels
+        self.center_trim_spin = QSpinBox()
+        self.center_trim_spin.setRange(0, 10000)
+        self.center_trim_spin.setValue(0)
+        self.center_trim_spin.setSingleStep(2)
+
         self.suffix_check = QCheckBox("Add filename suffix (e.g. _crop_800x600)")
         self.suffix_check.setChecked(True)
         self.overwrite_check = QCheckBox("Overwrite if file exists")
@@ -264,9 +281,19 @@ class MainWindow(QWidget):
         opts_layout.addWidget(self.anchor_combo, 1, 1)
         opts_layout.addWidget(QLabel("Split images"), 1, 2)
         opts_layout.addWidget(self.split_combo, 1, 3)
-        opts_layout.addWidget(self.suffix_check, 2, 0, 1, 2)
-        opts_layout.addWidget(self.overwrite_check, 2, 2, 1, 2)
+        opts_layout.addWidget(QLabel("Middle crop (px)"), 2, 0)
+        opts_layout.addWidget(self.center_trim_spin, 2, 1)
+        opts_layout.addWidget(self.suffix_check, 3, 0, 1, 2)
+        opts_layout.addWidget(self.overwrite_check, 3, 2, 1, 2)
 
+        # Enable/disable center trim control based on split mode
+        def _toggle_center_trim():
+            enable = self.split_combo.currentData() in ("vertical", "horizontal")
+            self.center_trim_spin.setEnabled(enable)
+        self.split_combo.currentIndexChanged.connect(_toggle_center_trim)
+        _toggle_center_trim()
+
+        # --- Run ---
         self.start_btn = QPushButton("Start Cropping")
         self.start_btn.clicked.connect(self.start)
         self.cancel_btn = QPushButton("Cancel")
@@ -285,7 +312,11 @@ class MainWindow(QWidget):
         run_layout.addWidget(self.progress, 1, 0, 1, 2)
         run_layout.addWidget(self.log, 2, 0, 1, 2)
 
+        # --- Main layout ---
         root = QVBoxLayout(self)
+        root.addWidget(paths_box)
+        root.addWidget(opts_box)
+        root.addWidget(run_box)
         root.addWidget(paths_box)
         root.addWidget(opts_box)
         root.addWidget(run_box)
@@ -353,12 +384,13 @@ class MainWindow(QWidget):
             add_suffix=self.suffix_check.isChecked(),
             overwrite=self.overwrite_check.isChecked(),
             split_mode=split_mode,
+            center_trim=int(self.center_trim_spin.value()),
         )
 
         self.start_btn.setEnabled(False)
         self.cancel_btn.setEnabled(True)
         self.progress.setValue(0)
-        self.log.append(f"Found {len(files)} images. Split: {split_mode}. Starting…")
+        self.log.append(f"Found {len(files)} images. Split: {split_mode}, middle crop: {int(self.center_trim_spin.value())} px. Starting…")
 
         self._thread = QThread(self)
         self._worker = CropWorker(cfg, files)
@@ -368,7 +400,7 @@ class MainWindow(QWidget):
         self._worker.message.connect(self.on_message)
         self._worker.finished.connect(self.on_finished)
         self._worker.finished.connect(self._thread.quit)
-        self._worker.finished.connect(self._worker.deleteLater)
+        self._thread.finished.connect(self._worker.deleteLater)
         self._thread.finished.connect(self._thread.deleteLater)
         self._thread.start()
 
@@ -403,3 +435,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+# EOF
