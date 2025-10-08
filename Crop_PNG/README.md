@@ -1,0 +1,1 @@
+ pip install PyQt6 PySide6 Pillow
