@@ -1,19 +1,12 @@
 {
-    "python-envs.pythonProjects": [
-        {
-            "path": "Chris",
-            "envManager": "ms-python.python:venv",
-            "packageManager": "ms-python.python:pip"
-        },
-        {
-            "path": "Chris/Crop_PNG",
-            "envManager": "ms-python.python:venv",
-            "packageManager": "ms-python.python:pip"
-        },
-        {
-            "path": "Chris/Crop_PNG/Book_Axe.py",
-            "envManager": "ms-python.python:venv",
-            "packageManager": "ms-python.python:pip"
-        }
+    // Prefer the project's .venv interpreter (create .venv at the workspace root)
+    "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+
+    // Auto-activate the selected interpreter in integrated terminals
+    "python.terminal.activateEnvironment": true,
+
+    // venv discovery path (helps the extension find the .venv)
+    "python.venvPath": "${workspaceFolder}",
+
     ]
 }
