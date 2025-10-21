@@ -1,7 +1,0 @@
-// START
-// DEF ageMachine(age):void
-//      WENN age > 50
-//          OUTPUT: Du bist alt geworden!
-//               END
-//          OUTPUT: Eines Tages wirst du auch alt sein!
-// END
